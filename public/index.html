@@ -3,36 +3,102 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Contact Directory</title>
-  <link rel="stylesheet" href="/style.css" />
+  <title>My Contacts</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <div class="container">
-    <h1>Contact Directory</h1>
-
-    <div class="top">
-      <input id="search" placeholder="Search by name..." />
-      <button id="newBtn">New Contact</button>
+<body class="page-dashboard">
+  
+  <div class="navbar">
+    <div class="navbar-brand">
+      <span class="brand-icon">📇</span>
+      <span class="brand-text">Directory<span class="text-primary">Hub</span></span>
     </div>
-
-    <div id="formWrap" class="hidden">
-      <form id="contactForm">
-        <input type="hidden" id="contactId" />
-        <label>Name<input id="name" required /></label>
-        <label>Email<input id="email" type="email" /></label>
-        <label>Phone<input id="phone" /></label>
-        <label>Notes<textarea id="notes"></textarea></label>
-        <label>Icon<input id="icon" type="file" accept="image/*" /></label>
-        <div class="form-actions">
-          <button type="submit">Save</button>
-          <button type="button" id="cancel">Cancel</button>
-        </div>
-      </form>
+    <div class="navbar-menu">
+      <div class="user-info">
+        <span class="user-icon">👤</span>
+        <span id="navUsername" class="username">Loading...</span>
+        <span id="navRole" class="role-badge"></span>
+      </div>
+      <a href="admin.html" id="navAdminBtn" class="btn-admin hidden">
+        <span>⚙️</span> Admin
+      </a>
+      <button id="navLogoutBtn" class="btn-logout">
+        <span>🚪</span> Logout
+      </button>
     </div>
-
-    <ul id="contacts"></ul>
   </div>
 
-  <script src="/app.js"></script>
+  <div class="container">
+    <div class="page-header">
+      <div class="header-content">
+        <h1>My Contacts</h1>
+        <p class="page-subtitle">Manage your personal and professional network</p>
+      </div>
+      <button id="newBtn" class="btn-primary">
+        <span>➕</span> New Contact
+      </button>
+    </div>
+
+    <div id="contactMessage" class="message hidden"></div>
+
+    <div class="search-bar">
+      <div class="search-input-wrapper">
+        <span class="search-icon">🔍</span>
+        <input id="search" type="text" placeholder="Search contacts by name, email, or phone..." />
+      </div>
+    </div>
+
+    <div id="formWrap" class="modal hidden">
+      <div class="modal-content form-card">
+        <div class="form-header">
+          <h3 id="formTitle">Contact Details</h3>
+          <button type="button" id="closeFormBtn" class="btn-icon">✕</button>
+        </div>
+        
+        <form id="contactForm">
+          <input type="hidden" id="contactId" />
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label>Full Name *</label>
+              <input id="name" type="text" required placeholder="Ex: John Doe" />
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input id="email" type="email" placeholder="john@example.com" />
+            </div>
+            <div class="form-group">
+              <label>Phone</label>
+              <input id="phone" type="tel" placeholder="+1 (555) 000-0000" />
+            </div>
+            <div class="form-group full-width">
+              <label>Notes</label>
+              <textarea id="notes" placeholder="Add extra details here..."></textarea>
+            </div>
+            <div class="form-group full-width">
+              <label>Profile Picture</label>
+              <input id="icon" type="file" accept="image/*" />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">Save Changes</button>
+            <button type="button" id="cancelFormBtn" class="btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="contactsList">
+      <ul id="contacts" class="contact-grid"></ul>
+      
+      <div id="emptyState" class="empty-state hidden">
+        <div class="empty-icon">📭</div>
+        <h3>No contacts found</h3>
+        <p>Your list is empty. Add a new contact to get started!</p>
+        <button id="emptyAddBtn" class="btn-primary">Add Contact</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
