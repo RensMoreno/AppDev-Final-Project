@@ -214,10 +214,22 @@ input:focus, textarea:focus {
   border-bottom: 1px solid #eee;
 }
 
-.data-table th { background: #f8f9fa; color: var(--secondary); font-weight: 600; }
-.data-table tr:hover { background: #fafafa; }
+.data-table th { 
+  background: #f8f9fa; 
+  color: var(--secondary); 
+  font-weight: 600; 
+}
 
-.user-cell { display: flex; align-items: center; gap: 10px; }
+.data-table tr:hover { 
+  background: #fafafa; 
+}
+
+.user-cell { 
+  display: flex; 
+  align-items: center; 
+  gap: 10px; 
+}
+
 .user-avatar.small {
   width: 32px; height: 32px;
   background: var(--primary); color: white;
@@ -233,14 +245,40 @@ input:focus, textarea:focus {
   font-weight: bold;
   text-transform: uppercase;
 }
-.role-badge.admin { background: #fadbd8; color: #c0392b; }
-.role-badge.user { background: #d4efdf; color: #27ae60; }
+.role-badge.admin { 
+  background: #fadbd8; 
+  color: #c0392b; 
+}
+
+.role-badge.user { 
+  background:#d4efdf;
+   color: #27ae60; 
+  }
 
 .btn-delete-user {
-  background: none; border: none; font-size: 1.2rem; cursor: pointer;
+  background: none; 
+  border: none; 
+  font-size: 1.2rem;
+  cursor: pointer;
   opacity: 0.6; transition: 0.2s;
 }
 .btn-delete-user:hover { opacity: 1; transform: scale(1.1); }
+
+/* Center the delete column and give it a fixed width to keep alignment */
+.data-table td.delete-col {
+  text-align: center;
+  width: 80px;
+}
+
+/* Center the actions column (View button) to align with the Actions header */
+.data-table td.actions-col {
+  text-align: center;
+  width: 140px;
+}
+
+.data-table td.actions-col .btn-secondary {
+  vertical-align: middle;
+}
 
 /* ==================== LOGIN PAGE ==================== */
 .page-login {

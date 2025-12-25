@@ -394,10 +394,12 @@ function renderUsers(users) {
           ${u.role !== 'admin' ? 
             `<button onclick="viewAsUser('${u.id}', '${escapeHtml(u.username)}')" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" title="View User's Contacts">👁️ View</button>` 
             : ''}
-          ${u.id !== currentUser.id ? 
-            `<button onclick="deleteUser('${u.id}')" class="btn-delete-user" title="Delete User">🗑️</button>` 
-            : '<span style="color:#999; font-size:0.85rem; font-style:italic;">(You)</span>'}
         </div>
+      </td>
+      <td class="delete-col">
+        ${u.id !== currentUser.id ? 
+          `<button onclick="deleteUser('${u.id}')" class="btn-delete-user" title="Delete User">🗑️</button>` 
+          : '<span style="color:#999; font-size:0.85rem; font-style:italic;">(You)</span>'}
       </td>
     </tr>
   `).join('');
