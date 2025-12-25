@@ -196,7 +196,6 @@ function initDashboard() {
   
   // Form Listeners
   $id('newBtn').addEventListener('click', () => openForm(null));
-  $id('emptyAddBtn').addEventListener('click', () => openForm(null));
   $id('closeFormBtn').addEventListener('click', closeForm);
   $id('cancelFormBtn').addEventListener('click', closeForm);
   $id('contactForm').addEventListener('submit', handleContactSubmit);
@@ -304,6 +303,19 @@ async function handleContactSubmit(e) {
   const iconInput = $id('icon');
   
   if (!name) { alert('Name is required'); return; }
+
+  // --- NEW PHONE VALIDATION (Supports Spaces) ---
+  if (phone) {
+    // Remove all spaces to check the "real" number pattern
+    const cleanPhone = phone.replace(/\s+/g, '');
+    const phRegex = /^(09\d{9}|\+63\d{10})$/;
+    
+    if (!phRegex.test(cleanPhone)) {
+      alert('Invalid Phone Number.\n\nAccepted formats (spaces allowed):\n• 09xx xxx xxxx (11 digits)\n• +63 9xx xxx xxxx (13 chars)');
+      return; 
+    }
+  }
+  // --------------------------------------------------
 
   const formData = new FormData();
   formData.append('name', name);
@@ -426,8 +438,19 @@ async function handleRegister(e) {
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ username, password, role })
     });
-    if (res.ok) { alert('User created'); e.target.reset(); loadUsers(); }
-    else { const data = await res.json(); alert(data.error); }
+    
+    if (res.ok) {
+      // UPDATED: Check role to customize the message
+      const msg = role === 'admin' ? 'System Administrator created successfully!' : 'Standard User created successfully!';
+      alert(msg);
+      
+      e.target.reset(); 
+      loadUsers(); 
+    }
+    else { 
+      const data = await res.json(); 
+      alert(data.error); 
+    }
   } catch (err) { alert('Error'); }
 }
 

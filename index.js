@@ -105,28 +105,29 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// === VALIDATION MIDDLEWARE (NEW) ===
+// Input validation middleware
 function validateContact(req, res, next) {
   const { name, email, phone } = req.body;
   
-  // 1. Name Check
   if (!name || name.trim().length === 0) {
     return res.status(400).json({ error: 'Name is required' });
   }
   
-  // 2. Email Check
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'Invalid email format' });
   }
   
-  // 3. Strict Philippine Mobile Number Check
+  // UPDATED: Allow spaces in phone validation
   if (phone) {
-    // Regex: Start with 09 (followed by 9 digits) OR +63 (followed by 10 digits)
+    // 1. Remove all spaces from the input to check the "raw" number
+    const cleanPhone = phone.replace(/\s+/g, '');
+
+    // 2. Check the raw number against strict PH standards
     const phMobileRegex = /^(09\d{9}|\+63\d{10})$/;
     
-    if (!phMobileRegex.test(phone)) {
+    if (!phMobileRegex.test(cleanPhone)) {
       return res.status(400).json({ 
-        error: 'Invalid Phone. Must be 09xxxxxxxxx (11 digits) or +639xxxxxxxxx (13 chars).' 
+        error: 'Invalid Phone. Must match 09xx xxx xxxx (11 digits) or +63 9xx... (13 chars).' 
       });
     }
   }
