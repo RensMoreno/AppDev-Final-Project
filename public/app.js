@@ -1,6 +1,11 @@
 const api = path => `/api${path}`;
 let authToken = localStorage.getItem('authToken');
 let currentUser = null;
+let allContacts = []; 
+
+// Check if we are "Impersonating" someone (Admin feature)
+let impersonateId = localStorage.getItem('impersonateId');
+let impersonateName = localStorage.getItem('impersonateName');
 
 function $id(id) { return document.getElementById(id); }
 function getAuthHeaders() { return { 'Authorization': `Bearer ${authToken}` }; }
@@ -8,43 +13,38 @@ function getAuthHeaders() { return { 'Authorization': `Bearer ${authToken}` }; }
 // ==================== PAGE ROUTING & SECURITY ====================
 
 async function initPage() {
-  // ROBUST FIX: Check body class to know exactly which page we are on
   const isLoginPage = document.body.classList.contains('page-login');
   const isAdminPage = document.body.classList.contains('page-admin');
-  
-  // 1. If we have no token
+  const isDashboard = document.body.classList.contains('page-dashboard');
+
   if (!authToken) {
-    if (isLoginPage) {
-      setupLoginUI(); // Only run this if we are actually on login.html
-    } else {
-      window.location.href = 'login.html'; // Redirect all other pages to login
-    }
+    if (isLoginPage) setupLoginUI();
+    else window.location.href = 'login.html';
     return;
   }
 
-  // 2. If we DO have a token, verify it
   if (authToken) {
     const valid = await verifyAuth();
-    
-    if (!valid) {
-      logout(); 
-      return;
-    }
+    if (!valid) { logout(); return; }
 
-    // 3. Logged in user trying to access login page? Go to Hub
+    // Routing Logic
     if (isLoginPage) {
-      window.location.href = 'index.html';
+      if (currentUser.role === 'admin') window.location.href = 'admin.html';
+      else window.location.href = 'index.html';
       return;
     }
 
-    // 4. Regular user trying to access Admin page? Kick them out
     if (isAdminPage && currentUser.role !== 'admin') {
-      alert('Access Denied: Administrator privileges required.');
       window.location.href = 'index.html';
       return;
     }
 
-    // 5. Initialize Page Specific Logic
+    if (isDashboard && currentUser.role === 'admin' && !impersonateId) {
+      alert("Admins must access the dashboard via the User List.");
+      window.location.href = 'admin.html';
+      return;
+    }
+
     setupUI();
   }
 }
@@ -63,48 +63,76 @@ async function verifyAuth() {
 
 function logout() {
   localStorage.removeItem('authToken');
+  stopImpersonating(); 
   window.location.href = 'login.html';
 }
 
+function stopImpersonating() {
+  localStorage.removeItem('impersonateId');
+  localStorage.removeItem('impersonateName');
+  if (currentUser && currentUser.role === 'admin') window.location.href = 'admin.html';
+}
+
 function setupUI() {
-  // Common Navbar Logic
-  const navUsername = $id('navUsername');
+  const usernameLabel = $id('navUsername') || $id('adminUsername');
   const navRole = $id('navRole');
   const navAdminBtn = $id('navAdminBtn');
   
-  if (navUsername) navUsername.textContent = currentUser.username;
+  if (usernameLabel) {
+    if ($id('navUsername') && impersonateId && impersonateName) {
+      usernameLabel.innerHTML = `<span style="color: #333; font-weight: bold;">Viewing: ${impersonateName}</span>`;
+      if (!$id('stopImpBtn')) {
+        const btn = document.createElement('button');
+        btn.id = 'stopImpBtn';
+        btn.className = 'btn-secondary';
+        btn.textContent = '🛑 Stop Viewing';
+        btn.onclick = stopImpersonating;
+        document.querySelector('.navbar-menu').prepend(btn);
+      }
+    } else {
+      usernameLabel.textContent = currentUser.username;
+    }
+  }
+
   if (navRole) {
     navRole.textContent = currentUser.role.toUpperCase();
     navRole.className = `role-badge ${currentUser.role}`;
   }
   
-  // Show admin button if admin
-  if (navAdminBtn && currentUser.role === 'admin') {
-    navAdminBtn.classList.remove('hidden');
-  }
+  if (navAdminBtn && currentUser.role === 'admin') navAdminBtn.classList.remove('hidden');
 
-  // Logout Listeners
   const logoutBtns = document.querySelectorAll('.btn-logout');
   logoutBtns.forEach(btn => btn.addEventListener('click', logout));
 
-  // Determine which page we are on and load data
   if (document.querySelector('.page-dashboard')) initDashboard();
   if (document.querySelector('.page-admin')) initAdmin();
 }
 
-// ==================== LOGIN PAGE LOGIC ====================
+// ==================== LOGIN / SIGNUP LOGIC ====================
 
 function setupLoginUI() {
+  $id('showSignup').onclick = (e) => {
+    e.preventDefault();
+    $id('loginForm').classList.add('hidden');
+    $id('signupForm').classList.remove('hidden');
+    $id('pageTitle').textContent = 'Create Account';
+  };
+
+  $id('showLogin').onclick = (e) => {
+    e.preventDefault();
+    $id('signupForm').classList.add('hidden');
+    $id('loginForm').classList.remove('hidden');
+    $id('pageTitle').textContent = 'Welcome Back';
+  };
+
   $id('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('button');
-    const originalText = btn.textContent;
-    btn.textContent = 'Authenticating...';
     btn.disabled = true;
+    btn.textContent = '...';
 
     const username = $id('loginUsername').value.trim();
     const password = $id('loginPassword').value;
-    const loginError = $id('loginError');
 
     try {
       const res = await fetch(api('/auth/login'), {
@@ -112,57 +140,110 @@ function setupLoginUI() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
+      const data = await res.json();
 
       if (res.ok) {
-        const data = await res.json();
         localStorage.setItem('authToken', data.token);
-        window.location.href = 'index.html'; // Redirect to Hub
+        if (data.user.role === 'admin') window.location.href = 'admin.html';
+        else window.location.href = 'index.html';
       } else {
-        const data = await res.json();
-        loginError.textContent = data.error || 'Invalid credentials';
-        loginError.classList.remove('hidden');
-        btn.textContent = originalText;
+        $id('loginError').textContent = data.error;
+        $id('loginError').classList.remove('hidden');
         btn.disabled = false;
+        btn.textContent = 'Sign In';
       }
     } catch (err) {
-      loginError.textContent = 'Server unreachable';
-      loginError.classList.remove('hidden');
-      btn.textContent = originalText;
+      alert('Server Error');
       btn.disabled = false;
     }
+  });
+
+  $id('signupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+
+    const username = $id('signupUsername').value.trim();
+    const password = $id('signupPassword').value;
+
+    try {
+      const res = await fetch(api('/auth/signup'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      
+      if (res.ok) {
+        alert('Account created! Please sign in.');
+        window.location.reload();
+      } else {
+        const data = await res.json();
+        alert(data.error);
+        btn.disabled = false;
+      }
+    } catch (err) { alert('Server Error'); btn.disabled = false; }
   });
 }
 
 // ==================== DASHBOARD LOGIC ====================
 
 function initDashboard() {
-  loadContacts();
+  fetchContactsData();
   
-  $id('search').addEventListener('input', (e) => loadContacts(e.target.value.trim()));
+  // Sorting and Filter Listeners
+  $id('search').addEventListener('input', applyControls);
+  $id('sortBy').addEventListener('change', applyControls);
   
+  // Form Listeners
   $id('newBtn').addEventListener('click', () => openForm(null));
   $id('emptyAddBtn').addEventListener('click', () => openForm(null));
   $id('closeFormBtn').addEventListener('click', closeForm);
   $id('cancelFormBtn').addEventListener('click', closeForm);
-
   $id('contactForm').addEventListener('submit', handleContactSubmit);
 }
 
-async function loadContacts(q = '') {
+async function fetchContactsData() {
   try {
-    const url = api(`/contacts${q ? `?search=${encodeURIComponent(q)}` : ''}`);
-    const res = await fetch(url, { headers: getAuthHeaders() });
+    let url = '/contacts';
+    if (impersonateId) url += `?targetUserId=${impersonateId}`;
+
+    const res = await fetch(api(url), { headers: getAuthHeaders() });
     if (!res.ok) throw new Error();
-    const contacts = await res.json();
-    renderContacts(contacts);
+    allContacts = await res.json();
+    applyControls();
   } catch (err) { console.error(err); }
+}
+
+function applyControls() {
+  const query = $id('search').value.toLowerCase().trim();
+  const sortType = $id('sortBy').value;
+
+  let filtered = allContacts.filter(c => 
+    (c.name && c.name.toLowerCase().includes(query)) ||
+    (c.email && c.email.toLowerCase().includes(query)) ||
+    (c.phone && c.phone.includes(query))
+  );
+
+  filtered.sort((a, b) => {
+    const dateA = new Date(a.created_at); 
+    const dateB = new Date(b.created_at);
+    switch(sortType) {
+      case 'az': return a.name.localeCompare(b.name);
+      case 'za': return b.name.localeCompare(a.name);
+      case 'newest': return dateB - dateA;
+      case 'oldest': return dateA - dateB;
+      default: return 0;
+    }
+  });
+
+  renderContacts(filtered);
 }
 
 function renderContacts(contacts) {
   const list = $id('contacts');
   const empty = $id('emptyState');
   list.innerHTML = '';
-  
+
   if (contacts.length === 0) {
     empty.classList.remove('hidden');
     return;
@@ -170,7 +251,6 @@ function renderContacts(contacts) {
   empty.classList.add('hidden');
 
   contacts.forEach(c => {
-    // ... (Use existing render logic, simplified here for brevity)
     const li = document.createElement('li');
     li.className = 'contact-item';
     li.innerHTML = `
@@ -181,10 +261,18 @@ function renderContacts(contacts) {
           ${c.email ? `<span>📧 ${escapeHtml(c.email)}</span>` : ''}
           ${c.phone ? `<span>📱 ${escapeHtml(c.phone)}</span>` : ''}
         </div>
+        
+        ${c.notes ? `
+          <div class="contact-description">
+            <small>📝 Notes:</small>
+            <p>${escapeHtml(c.notes)}</p>
+          </div>
+        ` : ''}
+        
       </div>
       <div class="contact-actions">
-        <button class="btn-icon-text btn-edit">✏️</button>
-        <button class="btn-icon-text btn-delete">🗑️</button>
+        <button class="btn-icon-text btn-edit">✏️ Edit</button>
+        <button class="btn-icon-text btn-delete">🗑️ Delete</button>
       </div>
     `;
     li.querySelector('.btn-edit').onclick = () => openForm(c);
@@ -193,10 +281,9 @@ function renderContacts(contacts) {
   });
 }
 
-// ... Form handling and Delete logic remains similar to original ...
-// Included essential helper:
+// Form Handlers
 function openForm(contact) {
-  $id('formWrap').classList.remove('hidden'); // This is now a modal
+  $id('formWrap').classList.remove('hidden');
   $id('formTitle').textContent = contact ? 'Edit Contact' : 'New Contact';
   $id('contactId').value = contact?.id || '';
   $id('name').value = contact?.name || '';
@@ -209,7 +296,6 @@ function closeForm() { $id('formWrap').classList.add('hidden'); }
 
 async function handleContactSubmit(e) {
   e.preventDefault();
-  
   const id = $id('contactId').value;
   const name = $id('name').value.trim();
   const email = $id('email').value.trim();
@@ -217,12 +303,8 @@ async function handleContactSubmit(e) {
   const notes = $id('notes').value.trim();
   const iconInput = $id('icon');
   
-  if (!name) {
-    alert('Name is required');
-    return;
-  }
+  if (!name) { alert('Name is required'); return; }
 
-  // Use FormData to handle text + file upload
   const formData = new FormData();
   formData.append('name', name);
   if (email) formData.append('email', email);
@@ -230,7 +312,10 @@ async function handleContactSubmit(e) {
   if (notes) formData.append('notes', notes);
   if (iconInput.files[0]) formData.append('icon', iconInput.files[0]);
 
-  // Determine if we are Creating (POST) or Updating (PUT)
+  if (impersonateId) {
+    formData.append('targetUserId', impersonateId);
+  }
+
   const method = id ? 'PUT' : 'POST';
   const url = id ? api(`/contacts/${id}`) : api('/contacts');
 
@@ -242,25 +327,19 @@ async function handleContactSubmit(e) {
   try {
     const res = await fetch(url, {
       method: method,
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-        // NOTE: Do NOT set 'Content-Type': 'application/json' here.
-        // The browser automatically sets the correct multipart boundary for FormData.
-      },
+      headers: { 'Authorization': `Bearer ${authToken}` },
       body: formData
     });
-
     if (res.ok) {
       closeForm();
-      loadContacts(); // Refresh the grid
-      e.target.reset(); // Clear the inputs
+      fetchContactsData();
+      e.target.reset();
     } else {
       const data = await res.json();
-      alert('Error: ' + (data.error || 'Failed to save contact'));
+      alert('Error: ' + data.error);
     }
-  } catch (err) {
-    console.error(err);
-    alert('Failed to connect to server');
+  } catch (err) { 
+    alert('Connection Error'); 
   } finally {
     btn.textContent = originalText;
     btn.disabled = false;
@@ -270,7 +349,7 @@ async function handleContactSubmit(e) {
 async function deleteContact(c) {
   if(confirm('Delete ' + c.name + '?')) {
     await fetch(api(`/contacts/${c.id}`), { method: 'DELETE', headers: getAuthHeaders() });
-    loadContacts();
+    fetchContactsData();
   }
 }
 
@@ -281,6 +360,15 @@ function initAdmin() {
   $id('refreshUsersBtn').addEventListener('click', loadUsers);
   $id('registerForm').addEventListener('submit', handleRegister);
 }
+
+// IMPERSONATION: Function to switch context
+window.viewAsUser = function(id, username) {
+  if (confirm(`View contacts as ${username}?`)) {
+    localStorage.setItem('impersonateId', id);
+    localStorage.setItem('impersonateName', username);
+    window.location.href = 'index.html'; // Go to dashboard
+  }
+};
 
 async function loadUsers() {
   const res = await fetch(api('/users'), { headers: getAuthHeaders() });
@@ -301,7 +389,16 @@ function renderUsers(users) {
       </td>
       <td><span class="role-badge ${u.role}">${u.role}</span></td>
       <td>${new Date(u.created_at).toLocaleDateString()}</td>
-      <td>${u.id !== currentUser.id ? `<button onclick="deleteUser('${u.id}')" class="btn-delete-user">🗑️</button>` : 'You'}</td>
+      <td>
+        <div style="display:flex; gap:10px; align-items:center;">
+          ${u.role !== 'admin' ? 
+            `<button onclick="viewAsUser('${u.id}', '${escapeHtml(u.username)}')" class="btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" title="View User's Contacts">👁️ View</button>` 
+            : ''}
+          ${u.id !== currentUser.id ? 
+            `<button onclick="deleteUser('${u.id}')" class="btn-delete-user" title="Delete User">🗑️</button>` 
+            : '<span style="color:#999; font-size:0.85rem; font-style:italic;">(You)</span>'}
+        </div>
+      </td>
     </tr>
   `).join('');
 }
@@ -312,7 +409,31 @@ function updateStats(users) {
   $id('statAdmins').textContent = users.filter(u => u.role === 'admin').length;
 }
 
-// ... Register and Delete User logic remains same ...
+// Admin Helper Functions
+async function handleRegister(e) {
+  e.preventDefault();
+  const username = $id('regUsername').value.trim();
+  const password = $id('regPassword').value;
+  const role = $id('regRole').value;
+  
+  if (!username || !password) return alert('Fill all fields');
+
+  try {
+    const res = await fetch(api('/auth/register'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ username, password, role })
+    });
+    if (res.ok) { alert('User created'); e.target.reset(); loadUsers(); }
+    else { const data = await res.json(); alert(data.error); }
+  } catch (err) { alert('Error'); }
+}
+
+async function deleteUser(id) {
+  if(!confirm('Delete User?')) return;
+  await fetch(api(`/users/${id}`), { method: 'DELETE', headers: getAuthHeaders() });
+  loadUsers();
+}
 
 function escapeHtml(text) {
   const div = document.createElement('div');
@@ -320,75 +441,4 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// START THE ENGINE
 document.addEventListener('DOMContentLoaded', initPage);
-
-// ==================== USER MANAGEMENT LOGIC ====================
-
-async function handleRegister(e) {
-  e.preventDefault();
-  
-  const username = $id('regUsername').value.trim();
-  const password = $id('regPassword').value;
-  const role = $id('regRole').value;
-  const btn = e.target.querySelector('button');
-  
-  // Basic validation
-  if (!username || !password) {
-    alert('Please fill in all fields');
-    return;
-  }
-
-  // UI Feedback
-  const originalText = btn.textContent;
-  btn.textContent = 'Creating...';
-  btn.disabled = true;
-
-  try {
-    const res = await fetch(api('/auth/register'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders() // Include the Admin Token
-      },
-      body: JSON.stringify({ username, password, role })
-    });
-
-    const data = await res.json();
-
-    if (res.ok) {
-      alert('User created successfully!');
-      e.target.reset(); // Clear the form
-      loadUsers(); // Refresh the table
-    } else {
-      alert('Error: ' + (data.error || 'Failed to create user'));
-    }
-  } catch (err) {
-    console.error(err);
-    alert('Network error. Check console.');
-  } finally {
-    btn.textContent = originalText;
-    btn.disabled = false;
-  }
-}
-
-async function deleteUser(userId) {
-  if (!confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
-
-  try {
-    const res = await fetch(api(`/users/${userId}`), {
-      method: 'DELETE',
-      headers: getAuthHeaders()
-    });
-
-    if (res.ok) {
-      loadUsers(); // Refresh the table
-    } else {
-      const data = await res.json();
-      alert('Error: ' + (data.error || 'Failed to delete user'));
-    }
-  } catch (err) {
-    console.error(err);
-    alert('Failed to connect to server');
-  }
-}
